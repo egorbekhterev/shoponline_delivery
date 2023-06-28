@@ -13,18 +13,22 @@ public class RabbitMqDeliveryListener {
 
     private PackageService packageService;
     private ObjectMapper mapper;
+    private RabbitMqTelegramPublisher rabbitMqTelegramPublisher;
 
-    public RabbitMqDeliveryListener(PackageService packageService, ObjectMapper mapper) {
+    public RabbitMqDeliveryListener(PackageService packageService, ObjectMapper mapper,
+                                    RabbitMqTelegramPublisher rabbitMqTelegramPublisher) {
         this.packageService = packageService;
         this.mapper = mapper.enable(JsonParser.Feature.ALLOW_LEADING_PLUS_SIGN_FOR_NUMBERS);
+        this.rabbitMqTelegramPublisher = rabbitMqTelegramPublisher;
     }
 
     @RabbitListener(queues = "deliveryQueue")
-    public void processInventoryUpdate(String message) {
-        log.info("Message received from queue: {}", message);
+    public void processDeliveryUpdate(String message) {
+        log.info("Message received from delivery queue: {}", message);
         try {
             String phoneNumber = mapper.readValue(message, String.class);
-            packageService.findByPhoneNumber(phoneNumber);
+            var packageDto = packageService.findByPhoneNumber(phoneNumber);
+            rabbitMqTelegramPublisher.publishTelegramUpdate(packageDto.getStatus());
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
